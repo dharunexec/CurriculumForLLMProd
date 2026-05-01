@@ -1,0 +1,113 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Agent Job Search Learning Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Theoretical Foundation Curriculum</p>
+      <h1>Multi-Agent Job Search System Tracker</h1>
+      <p class="subtitle">Learn by fundamentals, then concepts, then implementation. Track every topic, resource, and checkpoint.</p>
+      <div class="hero-actions">
+        <a class="btn" href="checklist.html">Open Checklist Tracker</a>
+        <button id="markAllPending" class="btn btn-ghost">Reset Progress</button>
+        <button id="expandAll" class="btn">Expand All</button>
+        <button id="collapseAll" class="btn btn-ghost">Collapse All</button>
+        <button id="exportProgress" class="btn">Export JSON</button>
+        <label for="importProgress" class="btn btn-ghost file-btn">Import JSON</label>
+        <input id="importProgress" type="file" accept="application/json" hidden />
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar card">
+      <h2>Dashboard</h2>
+      <div class="stats">
+        <div class="stat"><span>Total Topics</span><strong id="totalTopics">0</strong></div>
+        <div class="stat"><span>Completed</span><strong id="completedTopics">0</strong></div>
+        <div class="stat"><span>In Progress</span><strong id="inProgressTopics">0</strong></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span>Overall Progress</span>
+          <strong id="overallPercent">0%</strong>
+        </div>
+        <div class="progress-bar"><div id="overallBar"></div></div>
+      </div>
+
+      <h3>Weekly Roadmap (14 Weeks)</h3>
+      <ul id="weeklyPlan" class="weekly-list"></ul>
+
+      <h3>Learning Rule</h3>
+      <p class="rule">Do not touch code until you can explain the concept to a rubber duck.</p>
+
+      <h3>Topic Todo Nav</h3>
+      <ul id="topicTodoNav" class="weekly-list"></ul>
+    </aside>
+
+    <section class="content">
+      <div class="card filter-bar">
+        <input id="search" type="search" placeholder="Search topics, concepts, resources..." />
+        <select id="statusFilter">
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="done">Completed</option>
+        </select>
+      </div>
+
+      <div id="phaseContainer" class="phase-container"></div>
+    </section>
+  </main>
+
+  <template id="topicTemplate">
+    <article class="topic card" data-topic-id="">
+      <header class="topic-head">
+        <h4 class="topic-title"></h4>
+        <select class="topic-status" aria-label="topic status">
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="done">Completed</option>
+        </select>
+      </header>
+      <p class="why"></p>
+      <details>
+        <summary>What to learn</summary>
+        <ul class="learn-list"></ul>
+      </details>
+      <details>
+        <summary>Test your understanding</summary>
+        <ul class="test-list"></ul>
+      </details>
+      <details>
+        <summary>Resources</summary>
+        <ul class="resource-list"></ul>
+      </details>
+      <details>
+        <summary>Project connection</summary>
+        <p class="project-connection"></p>
+      </details>
+      <details>
+        <summary>Planning</summary>
+        <label class="field-label">Estimated study hours
+          <input class="topic-hours" type="number" min="0" step="0.5" placeholder="e.g. 3.5" />
+        </label>
+        <label class="field-label">Target date
+          <input class="topic-date" type="date" />
+        </label>
+      </details>
+      <details>
+        <summary>Notes / Journal</summary>
+        <textarea class="topic-notes" rows="4" placeholder="What you learned, blockers, insights..."></textarea>
+      </details>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
