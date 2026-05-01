@@ -3,12 +3,103 @@ function t(id,title,why,learn,tests,resources,connection,prerequisites,masteryCh
 function mastery(name,project){return{questions:[`Define ${name} in your own words and why it matters here.`,`What core assumptions does ${name} rely on?`,`What failure mode appears when ${name} is ignored?`,`How would you measure whether ${name} is working?`,`What tradeoff does ${name} introduce (latency, cost, reliability)?`,`What is one anti-pattern related to ${name}?`,`Where does ${name} break down at scale?`,`How does ${name} interact with another phase topic?`,`What does a minimal implementation of ${name} look like?`,`What production incident could ${name} have prevented?`],project}}
 function proj(title,description){return{title,description}}
 const storageKey="curriculum_tracker_status_v1",phaseContainer=document.getElementById("phaseContainer"),topicTemplate=document.getElementById("topicTemplate"),search=document.getElementById("search"),statusFilter=document.getElementById("statusFilter"),state={statuses:loadStatuses()};
-renderWeeklyPlan();renderPhases();renderTopicTodoNav();wireControls();refreshStats();
 function loadStatuses(){try{return JSON.parse(localStorage.getItem(storageKey)||"{}")}catch{return{}}} function saveStatuses(){localStorage.setItem(storageKey,JSON.stringify(state.statuses))} function getStatus(topicId){return(state.statuses[topicId]&&state.statuses[topicId].status)||"pending"} function ensureTopicRecord(topicId){if(typeof state.statuses[topicId]!=="object"){state.statuses[topicId]={status:state.statuses[topicId]||"pending",notes:"",hours:"",targetDate:""}} return state.statuses[topicId]}
 function renderWeeklyPlan(){const ul=document.getElementById("weeklyPlan");curriculum.weeklyPlan.forEach(item=>{const li=document.createElement("li");li.textContent=item;ul.appendChild(li)})}
 function renderPhases(){phaseContainer.innerHTML="";curriculum.phases.forEach(phase=>{const sec=document.createElement("section");sec.className="phase card";sec.innerHTML=`<h3>${phase.name}</h3><p class="phase-meta">Duration: ${phase.duration}${phase.optional?" | Optional":""}</p><div class="topic-grid"></div>`;const grid=sec.querySelector(".topic-grid");phase.topics.forEach(topic=>{const node=topicTemplate.content.firstElementChild.cloneNode(true),status=getStatus(topic.id),record=ensureTopicRecord(topic.id);node.dataset.topicId=topic.id;node.classList.add(status);node.querySelector(".topic-title").textContent=`${topic.id} ${topic.title}`;node.querySelector(".why").textContent=topic.why;node.querySelector(".project-connection").textContent=topic.connection;const sel=node.querySelector(".topic-status");sel.value=status;sel.addEventListener("change",()=>{ensureTopicRecord(topic.id).status=sel.value;saveStatuses();node.classList.remove("pending","in_progress","done");node.classList.add(sel.value);refreshStats();applyFilters()});const notes=node.querySelector(".topic-notes"),hours=node.querySelector(".topic-hours"),date=node.querySelector(".topic-date");notes.value=record.notes||"";hours.value=record.hours||"";date.value=record.targetDate||"";notes.addEventListener("input",()=>{ensureTopicRecord(topic.id).notes=notes.value;saveStatuses()});hours.addEventListener("input",()=>{ensureTopicRecord(topic.id).hours=hours.value;saveStatuses()});date.addEventListener("change",()=>{ensureTopicRecord(topic.id).targetDate=date.value;saveStatuses()});fillList(node.querySelector(".learn-list"),topic.learn);fillList(node.querySelector(".test-list"),topic.tests);fillResources(node.querySelector(".resource-list"),topic.resources);addAtomicPlan(node,topic);addPrerequisites(node,topic.prerequisites||[]);addMastery(node,topic.masteryCheck);grid.appendChild(node)});phaseContainer.appendChild(sec)})}
 function fillList(ul,items){if(!items.length){const li=document.createElement("li");li.textContent="No specific items listed.";ul.appendChild(li);return}items.forEach(text=>{const li=document.createElement("li");li.textContent=text;ul.appendChild(li)})}
 function fillResources(ul,resources){if(!resources.length){const li=document.createElement("li");li.textContent="Use your own preferred references for this topic.";ul.appendChild(li);return}resources.forEach(res=>{const li=document.createElement("li"),a=document.createElement("a");a.href=res.url;a.target="_blank";a.rel="noopener noreferrer";a.textContent=res.label;li.appendChild(a);ul.appendChild(li)})}
+const atomicResources=[
+{keys:["async","coroutine","event loop","blocking","non-blocking"],label:"Real Python asyncio",url:"https://realpython.com/async-io-python/"},
+{keys:["thread","process","gil","cpu-bound","i/o-bound"],label:"Python threading docs",url:"https://docs.python.org/3/library/threading.html"},
+{keys:["producer-consumer","delivery semantics","backpressure","dlq","durability","message"],label:"RabbitMQ tutorials",url:"https://www.rabbitmq.com/tutorials"},
+{keys:["redis streams","stream"],label:"Redis Streams docs",url:"https://redis.io/docs/latest/develop/data-types/streams/"},
+{keys:["rest","graphql","grpc","api"],label:"Google API design",url:"https://cloud.google.com/apis/design"},
+{keys:["idempotency"],label:"Stripe idempotency",url:"https://stripe.com/docs/idempotency"},
+{keys:["rate limit","token bucket","sliding window"],label:"Cloudflare rate limiting",url:"https://www.cloudflare.com/learning/bots/what-is-rate-limiting/"},
+{keys:["circuit"],label:"Fowler circuit breaker",url:"https://martinfowler.com/bliki/CircuitBreaker.html"},
+{keys:["backoff","jitter","retry"],label:"AWS jitter guide",url:"https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/"},
+{keys:["tokenization","token"],label:"HF tokenizers",url:"https://huggingface.co/docs/tokenizers/index"},
+{keys:["embedding","similarity","vector"],label:"Pinecone similarity",url:"https://www.pinecone.io/learn/vector-similarity/"},
+{keys:["attention"],label:"Illustrated Transformer",url:"https://jalammar.github.io/illustrated-transformer/"},
+{keys:["autoregressive","sampling","temperature","top-p","top-k"],label:"HF generation guide",url:"https://huggingface.co/blog/how-to-generate"},
+{keys:["few-shot","zero-shot","prompt","in-context"],label:"Prompting Guide",url:"https://www.promptingguide.ai/"},
+{keys:["injection","prompt injection"],label:"OWASP LLM Top 10",url:"https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+{keys:["dense","sparse","ann","hnsw","chunking","reranking","rag"],label:"RAG Reddit picks",url:"https://www.reddit.com/r/Rag/comments/1qvjhp4/what_are_the_best_resources_for_rag_in_2026/"},
+{keys:["qdrant"],label:"Qdrant docs",url:"https://qdrant.tech/documentation/"},
+{keys:["fp32","fp16","int8","int4","quantization","gptq","awq","gguf","kv cache"],label:"HF quantization",url:"https://huggingface.co/docs/transformers/quantization/overview"},
+{keys:["threat","stride","security","authn","authz","secrets"],label:"OWASP API Top 10",url:"https://owasp.org/www-project-api-security/"},
+{keys:["contract test","workflow replay","eval","load","chaos"],label:"LangSmith evals",url:"https://docs.smith.langchain.com/evaluation"},
+{keys:["k6"],label:"k6 docs",url:"https://k6.io/docs/"},
+{keys:["privacy","pii","retention","audit","gdpr","soc2"],label:"NIST privacy",url:"https://www.nist.gov/privacy-framework"},
+{keys:["processes","scheduling","memory","file descriptors","sockets","os"],label:"OSTEP",url:"https://pages.cs.wisc.edu/~remzi/OSTEP/"},
+{keys:["tcp","dns","tls","http/2","connection"],label:"Cloudflare learning",url:"https://www.cloudflare.com/learning/"},
+{keys:["wal","mvcc","indexes","query planning","hash","heap","graph","database"],label:"Use The Index Luke",url:"https://use-the-index-luke.com/"},
+{keys:["distributed","data systems"],label:"DDIA Reddit approved",url:"https://www.reddit.com/r/dataengineering/comments/1qhi4lr/designing_dataintensive_applications/"}
+];
+const exactAtomicResources={
+"sync vs async":{label:"FastAPI async guide",url:"https://fastapi.tiangolo.com/async/"},
+"threads vs processes vs coroutines":{label:"Python concurrency docs",url:"https://docs.python.org/3/library/concurrency.html"},
+"gil":{label:"Python GIL wiki",url:"https://wiki.python.org/moin/GlobalInterpreterLock"},
+"i/o-bound vs cpu-bound":{label:"Real Python concurrency",url:"https://realpython.com/python-concurrency/"},
+"event loop":{label:"Python asyncio event loop",url:"https://docs.python.org/3/library/asyncio-eventloop.html"},
+"producer-consumer":{label:"RabbitMQ work queues",url:"https://www.rabbitmq.com/tutorials/tutorial-two-python"},
+"delivery semantics":{label:"Redis Pub/Sub semantics",url:"https://redis.io/docs/latest/develop/pubsub/"},
+"backpressure":{label:"RabbitMQ consumer prefetch",url:"https://www.rabbitmq.com/docs/consumer-prefetch"},
+"dlq":{label:"RabbitMQ dead lettering",url:"https://www.rabbitmq.com/docs/dlx"},
+"durability tradeoffs":{label:"RabbitMQ durability",url:"https://www.rabbitmq.com/docs/queues#durability"},
+"rest vs graphql vs grpc":{label:"Google API design",url:"https://cloud.google.com/apis/design"},
+"idempotency":{label:"Stripe idempotency",url:"https://stripe.com/docs/idempotency"},
+"rate limiting":{label:"Cloudflare rate limiting",url:"https://www.cloudflare.com/learning/bots/what-is-rate-limiting/"},
+"circuit breaker":{label:"Fowler circuit breaker",url:"https://martinfowler.com/bliki/CircuitBreaker.html"},
+"backoff with jitter":{label:"AWS backoff + jitter",url:"https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/"},
+"tokenization":{label:"HF tokenizer summary",url:"https://huggingface.co/docs/transformers/tokenizer_summary"},
+"embeddings":{label:"Pinecone embeddings",url:"https://www.pinecone.io/learn/vector-embeddings/"},
+"attention":{label:"Illustrated Transformer",url:"https://jalammar.github.io/illustrated-transformer/"},
+"autoregressive generation":{label:"HF language modeling",url:"https://huggingface.co/docs/transformers/tasks/language_modeling"},
+"sampling controls":{label:"HF generation guide",url:"https://huggingface.co/blog/how-to-generate"},
+"zero/few-shot":{label:"Prompting Guide",url:"https://www.promptingguide.ai/"},
+"in-context learning":{label:"GPT-3 paper",url:"https://arxiv.org/abs/2005.14165"},
+"prompt templates":{label:"OpenAI prompt engineering",url:"https://platform.openai.com/docs/guides/prompt-engineering"},
+"prompt roles":{label:"OpenAI conversation roles",url:"https://platform.openai.com/docs/guides/text"},
+"injection awareness":{label:"OWASP prompt injection",url:"https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+"dense vs sparse retrieval":{label:"Pinecone hybrid search",url:"https://www.pinecone.io/learn/hybrid-search-intro/"},
+"similarity metrics":{label:"Pinecone vector similarity",url:"https://www.pinecone.io/learn/vector-similarity/"},
+"ann/hnsw":{label:"Qdrant indexing",url:"https://qdrant.tech/documentation/concepts/indexing/"},
+"chunking":{label:"Pinecone chunking",url:"https://www.pinecone.io/learn/chunking-strategies/"},
+"reranking":{label:"Pinecone reranking",url:"https://docs.pinecone.io/guides/search/rerank-results"},
+"fp32/16/int8/int4":{label:"HF quantization",url:"https://huggingface.co/docs/transformers/quantization/overview"},
+"qat vs post-training":{label:"PyTorch quantization",url:"https://pytorch.org/docs/stable/quantization.html"},
+"perplexity impact":{label:"HF perplexity",url:"https://huggingface.co/docs/transformers/perplexity"},
+"gptq/awq/gguf":{label:"HF quantization methods",url:"https://huggingface.co/docs/transformers/quantization/overview"},
+"kv cache quantization":{label:"HF KV cache",url:"https://huggingface.co/docs/transformers/cache_explanation"},
+"threat modeling stride":{label:"Microsoft threat modeling",url:"https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats"},
+"owasp api/llm risks":{label:"OWASP LLM Top 10",url:"https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+"secrets management":{label:"OWASP secrets management",url:"https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html"},
+"authn/authz":{label:"Auth0 auth guide",url:"https://auth0.com/docs/get-started/identity-fundamentals/authentication-and-authorization"},
+"contract tests":{label:"Pact contract testing",url:"https://docs.pact.io/"},
+"workflow replay":{label:"Temporal replay docs",url:"https://docs.temporal.io/workflows#replay"},
+"llm evals":{label:"LangSmith evaluation",url:"https://docs.smith.langchain.com/evaluation"},
+"load + chaos tests":{label:"k6 load testing",url:"https://k6.io/docs/"},
+"pii tagging":{label:"NIST privacy framework",url:"https://www.nist.gov/privacy-framework"},
+"retention/delete":{label:"GDPR deletion guide",url:"https://gdpr.eu/right-to-be-forgotten/"},
+"audit logs":{label:"OWASP logging cheat sheet",url:"https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"},
+"gdpr/ccpa/soc2 basics":{label:"SOC 2 overview",url:"https://www.aicpa-cima.com/resources/landing/system-and-organization-controls-soc-suite-of-services"},
+"processes/threads":{label:"OSTEP processes",url:"https://pages.cs.wisc.edu/~remzi/OSTEP/"},
+"scheduling":{label:"OSTEP scheduling",url:"https://pages.cs.wisc.edu/~remzi/OSTEP/"},
+"memory":{label:"OSTEP memory",url:"https://pages.cs.wisc.edu/~remzi/OSTEP/"},
+"sockets":{label:"Beej sockets guide",url:"https://beej.us/guide/bgnet/"},
+"file descriptors":{label:"Linux file descriptors",url:"https://man7.org/linux/man-pages/man2/open.2.html"},
+"tcp/ip":{label:"Cloudflare TCP/IP",url:"https://www.cloudflare.com/learning/network-layer/internet-protocol/"},
+"dns":{label:"Cloudflare DNS",url:"https://www.cloudflare.com/learning/dns/what-is-dns/"},
+"tls":{label:"Cloudflare TLS",url:"https://www.cloudflare.com/learning/ssl/transport-layer-security-tls/"},
+"http/2":{label:"MDN HTTP/2",url:"https://developer.mozilla.org/en-US/docs/Glossary/HTTP_2"},
+"connection pooling":{label:"PostgreSQL pooling",url:"https://www.postgresql.org/docs/current/runtime-config-connection.html"},
+"wal/mvcc":{label:"PostgreSQL MVCC",url:"https://www.postgresql.org/docs/current/mvcc-intro.html"},
+"indexes":{label:"Use The Index, Luke",url:"https://use-the-index-luke.com/"},
+"query planning":{label:"PostgreSQL EXPLAIN",url:"https://www.postgresql.org/docs/current/using-explain.html"},
+"hash/heap/graph basics":{label:"MIT 6.006 algorithms",url:"https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-fall-2011/"}
+};
+function findAtomicResource(text,base){const exact=(base||"").toLowerCase();if(exactAtomicResources[exact])return exactAtomicResources[exact];const lower=text.toLowerCase();for(const res of atomicResources){if(res.keys.some(key=>lower.includes(key)))return res}return{label:"System design primer",url:"https://github.com/donnemartin/system-design-primer"}}
 function buildAtomicSubtopics(topic){
 const fromLearn=(topic.learn||[]).flatMap((item,idx)=>{
 const base=item.toLowerCase();
@@ -23,12 +114,12 @@ if(base.includes("rate limit")||base.includes("backoff")||base.includes("circuit
 if(base.includes("embedding")||base.includes("similarity")||base.includes("hnsw")) common.push({name:`${item}: Work through a tiny vector similarity example manually`,learnHours:1,taskHours:1});
 if(base.includes("memory")||base.includes("cache")) common.push({name:`${item}: Define invalidation/forgetting policy`,learnHours:0.75,taskHours:0.75});
 if(base.includes("security")||base.includes("auth")) common.push({name:`${item}: Threat-model one abuse case and mitigation`,learnHours:1,taskHours:1});
-return common.map((m,i)=>({...m,key:`${idx}-${i}`}));
+return common.map((m,i)=>({...m,key:`${idx}-${i}`,base:item}));
 });
 const source=(topic.atomicSubtopics&&topic.atomicSubtopics.length?topic.atomicSubtopics:fromLearn);
-return source.map((item)=>({name:item.name||item,learnHours:item.learnHours||1,taskHours:item.taskHours||0.75}))
+return source.map((item)=>({name:item.name||item,base:item.base||item.name||item,learnHours:item.learnHours||1,taskHours:item.taskHours||0.75}))
 }
-function addAtomicPlan(node,topic){const modules=buildAtomicSubtopics(topic);const totalLearn=modules.reduce((a,m)=>a+m.learnHours,0),totalTask=modules.reduce((a,m)=>a+m.taskHours,0);const d=document.createElement("details");d.innerHTML="<summary>Atomic Subtopics (Modular Plan + Time Estimates)</summary>";const intro=document.createElement("p");intro.className="project-connection";intro.textContent=`Estimated for a medium learner. Learn time: ${totalLearn.toFixed(1)}h | Task time: ${totalTask.toFixed(1)}h | Total: ${(totalLearn+totalTask).toFixed(1)}h`;const ul=document.createElement("ul");modules.forEach((m,i)=>{const li=document.createElement("li");li.textContent=`${i+1}. ${m.name} - Learn: ${m.learnHours}h, Task: ${m.taskHours}h`;ul.appendChild(li)});d.append(intro,ul);node.appendChild(d)}
+function addAtomicPlan(node,topic){const modules=buildAtomicSubtopics(topic);const totalLearn=modules.reduce((a,m)=>a+m.learnHours,0),totalTask=modules.reduce((a,m)=>a+m.taskHours,0);const d=document.createElement("details");d.innerHTML="<summary>Atomic Subtopics (Modular Plan + Time Estimates)</summary>";const intro=document.createElement("p");intro.className="project-connection";intro.textContent=`Estimated for a medium learner. Learn time: ${totalLearn.toFixed(1)}h | Task time: ${totalTask.toFixed(1)}h | Total: ${(totalLearn+totalTask).toFixed(1)}h`;const ul=document.createElement("ul");modules.forEach((m,i)=>{const res=findAtomicResource(m.name,m.base);const li=document.createElement("li");const span=document.createElement("span");span.textContent=`${i+1}. ${m.name} - Learn: ${m.learnHours}h, Task: ${m.taskHours}h `;const a=document.createElement("a");a.href=res.url;a.target="_blank";a.rel="noopener noreferrer";a.className="atomic-resource";a.textContent=res.label;a.title=res.label;li.append(span,a);ul.appendChild(li)});d.append(intro,ul);node.appendChild(d)}
 function renderTopicTodoNav(){const ul=document.getElementById("topicTodoNav");if(!ul)return;ul.innerHTML="";curriculum.phases.forEach(phase=>{phase.topics.forEach(topic=>{const li=document.createElement("li");const a=document.createElement("a");const status=getStatus(topic.id);a.href=`#topic-${topic.id}`;a.textContent=`[${status==="done"?"x":status==="in_progress"?"~":" "}] ${topic.id} ${topic.title}`;if(status==="done")a.className="todo-done";if(status==="in_progress")a.className="todo-in-progress";a.addEventListener("click",(e)=>{e.preventDefault();const el=document.querySelector(`[data-topic-id='${topic.id}']`);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),1200)}});li.appendChild(a);ul.appendChild(li)})})}
 function addPrerequisites(node,prereqs){const d=document.createElement("details");d.innerHTML="<summary>Prerequisites</summary>";const ul=document.createElement("ul");if(!prereqs.length){const li=document.createElement("li");li.textContent="None";ul.appendChild(li)} else {prereqs.forEach(id=>{const li=document.createElement("li");const a=document.createElement("a");a.href=`#topic-${id}`;a.textContent=`Topic ${id}`;a.addEventListener("click",(e)=>{e.preventDefault();const el=document.querySelector(`[data-topic-id='${id}']`);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),1200)}});li.appendChild(a);ul.appendChild(li)})}d.appendChild(ul);node.appendChild(d);node.id=`topic-${node.dataset.topicId}`}
 function addMastery(node,masteryCheck){const d=document.createElement("details");d.innerHTML="<summary>Mastery Check (10 Questions + Project)</summary>";const qTitle=document.createElement("p");qTitle.textContent="Questions:";const ul=document.createElement("ul");masteryCheck.questions.forEach(q=>{const li=document.createElement("li");li.textContent=q;ul.appendChild(li)});const pTitle=document.createElement("p");pTitle.textContent="Todo Project:";const p=document.createElement("p");p.className="project-connection";p.textContent=`${masteryCheck.project.title} - ${masteryCheck.project.description}`;d.append(qTitle,ul,pTitle,p);node.appendChild(d)}
@@ -37,3 +128,4 @@ function wireControls(){search.addEventListener("input",applyFilters);statusFilt
 function applyFilters(){const q=search.value.trim().toLowerCase(),status=statusFilter.value;document.querySelectorAll(".topic").forEach(card=>{const id=card.dataset.topicId,text=card.innerText.toLowerCase();const statusMatch=status==="all"||getStatus(id)===status,queryMatch=!q||text.includes(q);card.style.display=statusMatch&&queryMatch?"block":"none"})}
 function exportProgress(){const data={version:1,exportedAt:new Date().toISOString(),statuses:state.statuses};const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="curriculum-progress.json";a.click();URL.revokeObjectURL(url)}
 function importProgress(evt){const file=evt.target.files&&evt.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const parsed=JSON.parse(reader.result);if(!parsed||typeof parsed!=="object"||!parsed.statuses)throw new Error("Invalid JSON format");state.statuses=parsed.statuses;saveStatuses();renderPhases();refreshStats();applyFilters();alert("Progress imported successfully.");}catch{alert("Could not import file. Please select a valid curriculum progress JSON.");} finally{evt.target.value=""}};reader.readAsText(file)}
+renderWeeklyPlan();renderPhases();renderTopicTodoNav();wireControls();refreshStats();
